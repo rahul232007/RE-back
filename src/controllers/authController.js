@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const Admin = require('../models/Admin');
 const { successResponse, errorResponse } = require('../utils/responseHelper');
 
-// ─── SEED ADMIN (called on startup if no admin exists) ────────────────────────
+// ─── SEED ADMIN (called when MongoDB connects if no admin exists) ─────────────
 const seedAdmin = async () => {
   try {
     const count = await Admin.countDocuments();
@@ -18,7 +19,10 @@ const seedAdmin = async () => {
     console.error('❌ Error seeding admin:', err.message);
   }
 };
-seedAdmin();
+
+mongoose.connection.once('connected', () => {
+  seedAdmin();
+});
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const signToken = (id) =>

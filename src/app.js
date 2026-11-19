@@ -4,6 +4,8 @@ const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
+const mongoose = require('mongoose');
+
 const authRoutes = require('./routes/authRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const projectRoutes = require('./routes/projectRoutes');
@@ -51,13 +53,16 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// ─── HEALTH CHECK ──────────────────────────────────────────────────────────────
-app.get('/api/health', (req, res) => {
+// ─── HEALTH CHECKS (Supports root, /health, and /api/health for Fly.io/Docker) ──
+app.get(['/', '/health', '/api/health'], (req, res) => {
+  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'connecting_or_disconnected';
   res.status(200).json({
     success: true,
     message: 'Rahul Enterprises API is running',
+    port: process.env.PORT || 8080,
+    database: dbStatus,
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV,
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 

@@ -2,17 +2,15 @@ require('dotenv').config();
 const app = require('./src/app');
 const connectDB = require('./src/config/db');
 
-const PORT = process.env.PORT || 5000;
+// In Fly.io / Docker containers, default port is 8080 and host must be 0.0.0.0
+const PORT = process.env.PORT || 8080;
+const HOST = '0.0.0.0';
 
-// Connect to MongoDB then start server
-connectDB()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`✅ Rahul Enterprises API running on http://localhost:${PORT}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-    });
-  })
-  .catch((err) => {
-    console.error('❌ Failed to connect to MongoDB:', err.message);
-    process.exit(1);
-  });
+// Start listening immediately so cloud health checks pass and container does not crash
+app.listen(PORT, HOST, () => {
+  console.log(`✅ Rahul Enterprises API listening on http://${HOST}:${PORT}`);
+  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Connect to MongoDB asynchronously with auto-retry
+connectDB();
