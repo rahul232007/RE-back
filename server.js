@@ -1,6 +1,7 @@
 require('dotenv').config();
 const app = require('./src/app');
-const connectDB = require('./src/config/db');
+const { connectDB } = require('./src/config/db');
+const { seedDefaultAdmin } = require('./src/utils/seedAdmin');
 
 // In Fly.io / Docker containers, default port is 8080 and host must be 0.0.0.0
 const PORT = process.env.PORT || 8080;
@@ -12,5 +13,16 @@ app.listen(PORT, HOST, () => {
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Connect to MongoDB asynchronously with auto-retry
-connectDB();
+// Initialize PostgreSQL after the HTTP listener is available for Fly health checks.
+const initializeDatabase = async () => {
+  try {
+    await connectDB();
+    await seedDefaultAdmin();
+  } catch (err) {
+    console.error(`❌ PostgreSQL initialization failed: ${err.message}`);
+    const retry = setTimeout(initializeDatabase, 10_000);
+    retry.unref();
+  }
+};
+
+initializeDatabase();

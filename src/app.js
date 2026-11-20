@@ -4,7 +4,7 @@ const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 
-const mongoose = require('mongoose');
+const { isDatabaseConnected } = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
 const contactRoutes = require('./routes/contactRoutes');
@@ -15,9 +15,12 @@ const app = express();
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'https://re-front.vercel.app',
+  'https://rahul-enterprises-ten.vercel.app',
+  ...(process.env.FRONTEND_URLS || '').split(',').map((origin) => origin.trim()),
+  process.env.FRONTEND_URL,
   'http://localhost:5173',
-];
+].filter(Boolean);
 
 app.use(
   cors({
@@ -54,8 +57,8 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // ─── HEALTH CHECKS (Supports root, /health, and /api/health for Fly.io/Docker) ──
-app.get(['/', '/health', '/api/health'], (req, res) => {
-  const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'connecting_or_disconnected';
+app.get(['/', '/health', '/api/health'], async (req, res) => {
+  const dbStatus = (await isDatabaseConnected()) ? 'connected' : 'connecting_or_disconnected';
   res.status(200).json({
     success: true,
     message: 'Rahul Enterprises API is running',

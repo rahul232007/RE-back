@@ -1,8 +1,7 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
-const mongoose = require('mongoose');
 const Project = require('../models/Project');
-const Admin = require('../models/Admin');
-const connectDB = require('../config/db');
+const { pool, connectDB } = require('../config/db');
+const { seedDefaultAdmin } = require('./seedAdmin');
 
 const sampleProjects = [
   {
@@ -61,20 +60,10 @@ const sampleProjects = [
 const runSeed = async () => {
   try {
     await connectDB();
-
-    // Check or create Admin
-    const adminCount = await Admin.countDocuments();
-    if (adminCount === 0) {
-      await Admin.create({
-        email: process.env.ADMIN_EMAIL || 'admin@rahulenterprises.com',
-        password: process.env.ADMIN_PASSWORD || 'Admin@123456',
-        name: 'Administrator',
-      });
-      console.log('✅ Default admin account created');
-    }
+    await seedDefaultAdmin();
 
     // Seed Projects
-    const projectCount = await Project.countDocuments();
+    const projectCount = await Project.count();
     if (projectCount === 0) {
       for (const p of sampleProjects) {
         await Project.create(p);
@@ -85,9 +74,11 @@ const runSeed = async () => {
     }
 
     console.log('🌱 Seeding process complete!');
+    await pool.end();
     process.exit(0);
   } catch (err) {
     console.error('❌ Seeding error:', err);
+    await pool.end();
     process.exit(1);
   }
 };

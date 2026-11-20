@@ -1,66 +1,70 @@
-const mongoose = require('mongoose');
+const { pool } = require('../config/db');
 
-const contactSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, 'Name is required'],
-      trim: true,
-      minlength: [2, 'Name must be at least 2 characters'],
-      maxlength: [100, 'Name cannot exceed 100 characters'],
-    },
-    email: {
-      type: String,
-      required: [true, 'Email is required'],
-      lowercase: true,
-      trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
-    },
-    phone: {
-      type: String,
-      trim: true,
-    },
-    company: {
-      type: String,
-      trim: true,
-      maxlength: [150, 'Company name cannot exceed 150 characters'],
-    },
-    service: {
-      type: String,
-      trim: true,
-      maxlength: [150, 'Service cannot exceed 150 characters'],
-    },
-    budget: {
-      type: String,
-      trim: true,
-      maxlength: [100, 'Budget cannot exceed 100 characters'],
-    },
-    subject: {
-      type: String,
-      trim: true,
-      maxlength: [200, 'Subject cannot exceed 200 characters'],
-    },
-    message: {
-      type: String,
-      required: [true, 'Message is required'],
-      trim: true,
-      minlength: [10, 'Message must be at least 10 characters'],
-      maxlength: [2000, 'Message cannot exceed 2000 characters'],
-    },
-    status: {
-      type: String,
-      enum: ['new', 'read', 'replied', 'closed'],
-      default: 'new',
-    },
-    ipAddress: {
-      type: String,
-    },
-  },
-  { timestamps: true }
-);
+const mapContact = (row) => row && ({
+  _id: String(row.id),
+  id: String(row.id),
+  name: row.name,
+  email: row.email,
+  phone: row.phone,
+  company: row.company,
+  service: row.service,
+  budget: row.budget,
+  subject: row.subject,
+  message: row.message,
+  status: row.status,
+  ipAddress: row.ip_address,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
 
-// Index for faster queries
-contactSchema.index({ status: 1, createdAt: -1 });
-contactSchema.index({ email: 1 });
+const create = async (contact) => {
+  const { rows } = await pool.query(
+    `INSERT INTO contacts (name, email, phone, company, service, budget, subject, message, ip_address)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING *`,
+    [contact.name, contact.email, contact.phone || null, contact.company || null,
+      contact.service || null, contact.budget || null, contact.subject || null,
+      contact.message, contact.ipAddress || null]
+  );
+  return mapContact(rows[0]);
+};
 
-module.exports = mongoose.model('Contact', contactSchema);
+const findPage = async ({ status, limit, offset, sort }) => {
+  const sortColumn = sort.includes('createdAt') ? 'created_at' : 'updated_at';
+  const direction = sort.startsWith('-') ? 'DESC' : 'ASC';
+  const values = [];
+  const where = status ? 'WHERE status = $1' : '';
+  if (status) values.push(status);
+  values.push(limit, offset);
+  const { rows } = await pool.query(
+    `SELECT * FROM contacts ${where} ORDER BY ${sortColumn} ${direction}, id DESC
+     LIMIT $${values.length - 1} OFFSET $${values.length}`,
+    values
+  );
+  return rows.map(mapContact);
+};
+
+const count = async (status) => {
+  const { rows } = await pool.query(
+    status ? 'SELECT COUNT(*)::int AS count FROM contacts WHERE status = $1' : 'SELECT COUNT(*)::int AS count FROM contacts',
+    status ? [status] : []
+  );
+  return rows[0].count;
+};
+
+const updateStatus = async (id, status) => {
+  if (!/^\d+$/.test(String(id))) return null;
+  const { rows } = await pool.query(
+    'UPDATE contacts SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
+    [status, id]
+  );
+  return mapContact(rows[0]);
+};
+
+const deleteById = async (id) => {
+  if (!/^\d+$/.test(String(id))) return null;
+  const { rows } = await pool.query('DELETE FROM contacts WHERE id = $1 RETURNING *', [id]);
+  return mapContact(rows[0]);
+};
+
+module.exports = { create, findPage, count, updateStatus, deleteById };
